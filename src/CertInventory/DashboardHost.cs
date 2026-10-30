@@ -5,14 +5,14 @@ namespace CertInventory;
 
 public static class DashboardHost
 {
-    static readonly Regex PrefixPattern = new(@"\Ahttp://[A-Za-z0-9._:-]+:\d+/\z", RegexOptions.CultureInvariant);
+    static readonly Regex PrefixPattern = new(@"\Ahttp://(\+|\*|[A-Za-z0-9._-]+):\d+/\z", RegexOptions.CultureInvariant);
 
     public static int Run(string jsonPath, string listen)
     {
         var prefix = listen.EndsWith('/') ? listen : listen + "/";
-        if (prefix.IndexOfAny(new[] { '\r', '\n', '\0', '+', '*' }) >= 0 || !PrefixPattern.IsMatch(prefix))
+        if (prefix.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0 || !PrefixPattern.IsMatch(prefix))
         {
-            Console.Error.WriteLine("Listen must be one http address with a port, such as http://127.0.0.1:8787/. Do not use + or *.");
+            Console.Error.WriteLine("Listen must be one http address with a port, such as http://127.0.0.1:8787/. A container uses http://+:8787/.");
             return 1;
         }
         if (!File.Exists(jsonPath))

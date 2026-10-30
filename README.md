@@ -10,6 +10,8 @@ The offline root is recorded by name only. End-entity rows come from the issuing
 
 PowerShell port: [adcs_cert_inventory-powershell](https://github.com/nwlterry/adcs_cert_inventory-powershell).
 
+The console can also run as a container on the isolated network. The container only serves the JSON this program writes. It does not contact a CA. [adcs_cert_inventory-container](https://github.com/nwlterry/adcs_cert_inventory-container).
+
 ## Collect
 
 ```powershell
@@ -34,7 +36,7 @@ Open `http://127.0.0.1:8787/` on that machine. The dashboard files are `dashboar
 | `--skip-dns` | Do not resolve CN and DNS SAN names while building the system list. The client-status probe still runs. |
 | `--demo` | Write a small file and do not contact a CA, DNS, or the network. |
 | `--serve` | After collection, host the on-prem dashboard until Ctrl+C. |
-| `--listen` | HTTP prefix. Default `http://127.0.0.1:8787/`. One address only. Do not use `+` or `*`. |
+| `--listen` | HTTP prefix. Default `http://127.0.0.1:8787/`. One address, or `http://+:8787/` inside a container. |
 | `--self-test` | Check serial rules, shared-certificate rows, and that a bad name is not looked up. |
 
 `--serve` with no issuing CA hosts the JSON already at `--output` and does not contact a CA. To show the console to another host on the same isolated network:
