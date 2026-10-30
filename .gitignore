@@ -1,0 +1,6 @@
+bin/
+obj/
+cert-inventory.json
+*.cer
+.vs/
+*.user
