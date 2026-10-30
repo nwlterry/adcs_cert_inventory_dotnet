@@ -126,6 +126,15 @@ public static class Validation
         if (ClientChecks.Classify(false, true, System.Net.NetworkInformation.IPStatus.TimedOut) != "inactive") failures.Add("inactive");
         if (ClientChecks.Classify(false, true, System.Net.NetworkInformation.IPStatus.DestinationHostUnreachable) != "not-on-network")
             failures.Add("unreachable");
+        if (ClientChecks.Kind("es-data-01.obs.corp.local") != ProbeKind.Host) failures.Add("host kind");
+        if (ClientChecks.Kind("10.16.8.21") != ProbeKind.UnicastIp) failures.Add("unicast kind");
+        if (ClientChecks.Kind("bad host") != ProbeKind.RejectedHost) failures.Add("rejected host");
+        if (ClientChecks.Kind("224.0.0.1") != ProbeKind.RejectedIp) failures.Add("multicast");
+        if (ClientChecks.Kind("0.0.0.0") != ProbeKind.RejectedIp) failures.Add("unspecified");
+        var blocked = ClientChecks.Probe("bad host");
+        if (blocked.Status != "not-in-dns" || blocked.Address != null) failures.Add("rejected host is not looked up");
+        var blockedIp = ClientChecks.Probe("255.255.255.255");
+        if (blockedIp.Status != "not-on-network" || blockedIp.Address != null) failures.Add("broadcast is not pinged");
 
         var sanOnly = new CertRecord
         {

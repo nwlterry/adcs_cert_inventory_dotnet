@@ -20,9 +20,21 @@ public static class InventoryBuilder
     {
         var clean = config.Trim().TrimStart('\\');
         var parts = clean.Split('\\', 2);
-        if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[0]) || string.IsNullOrWhiteSpace(parts[1]))
+        if (parts.Length < 2 || !SafeToken(parts[0], false) || !SafeToken(parts[1], true))
             throw new ArgumentException("Issuing CA config must be 'hostname\\CA Name'. Got '" + config + "'.");
         return new IssuingCa { Host = parts[0], Name = parts[1], Config = parts[0] + "\\" + parts[1] };
+    }
+
+    static bool SafeToken(string value, bool allowSpace)
+    {
+        if (string.IsNullOrWhiteSpace(value) || value.Length > 200 || value.StartsWith('-')) return false;
+        if (!allowSpace && value.Any(char.IsWhiteSpace)) return false;
+        foreach (var c in value)
+        {
+            if (char.IsControl(c)) return false;
+            if (c is '"' or '\'' or '&' or '|' or ';' or '`' or '$' or '<' or '>') return false;
+        }
+        return true;
     }
 
     public static CertRecord NewRecord(
@@ -88,6 +100,7 @@ public static class InventoryBuilder
                 ips = task.Result
                     .Where(a => a.AddressFamily == AddressFamily.InterNetwork)
                     .Select(a => a.ToString())
+                    .Where(ClientChecks.IsUnicastIpv4)
                     .Distinct(StringComparer.Ordinal)
                     .ToList();
             }
@@ -139,7 +152,7 @@ public static class InventoryBuilder
             X509Certificate2? cert = null;
             try
             {
-                cert = new X509Certificate2(raw);
+                cert = new X509Certificate2(raw, (string?)null, X509KeyStorageFlags.EphemeralKeySet);
                 cn = cert.GetNameInfo(X509NameType.SimpleName, false);
                 if (string.IsNullOrWhiteSpace(cn)) cn = requestCn;
                 subject = cert.Subject;
