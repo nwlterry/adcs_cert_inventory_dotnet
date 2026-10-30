@@ -1,7 +1,16 @@
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
 
 namespace CertInventory;
+
+public enum ProbeKind
+{
+    Host,
+    UnicastIp,
+    RejectedHost,
+    RejectedIp,
+}
 
 public static class ClientChecks
 {
@@ -26,6 +35,35 @@ public static class ClientChecks
         return rows;
     }
 
+    public static ProbeKind Kind(string name)
+    {
+        if (Regex.IsMatch(name, @"^\d{1,3}(\.\d{1,3}){3}$"))
+            return IsUnicastIpv4(name) ? ProbeKind.UnicastIp : ProbeKind.RejectedIp;
+        return IsDnsName(name) ? ProbeKind.Host : ProbeKind.RejectedHost;
+    }
+
+    public static bool IsUnicastIpv4(string name)
+    {
+        if (!IPAddress.TryParse(name, out var address)) return false;
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork) return false;
+        var text = address.ToString();
+        if (!string.Equals(text, name, StringComparison.Ordinal)) return false;
+        var first = address.GetAddressBytes()[0];
+        return first != 0 && first < 224;
+    }
+
+    public static bool IsDnsName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 253) return false;
+        if (name.StartsWith('.') || name.EndsWith('.')) return false;
+        foreach (var label in name.Split('.'))
+        {
+            if (label.Length is < 1 or > 63) return false;
+            if (!Regex.IsMatch(label, @"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")) return false;
+        }
+        return true;
+    }
+
     public static string Classify(bool isIp, bool resolved, IPStatus? ping)
     {
         if (!resolved) return isIp ? "not-on-network" : "not-in-dns";
@@ -46,7 +84,11 @@ public static class ClientChecks
     public static (string Status, string? Address) Probe(string name)
     {
         if (Cache.TryGetValue(name, out var cached)) return cached;
-        var isIp = Regex.IsMatch(name, @"^\d{1,3}(\.\d{1,3}){3}$");
+        var kind = Kind(name);
+        if (kind == ProbeKind.RejectedHost) return Remember(name, "not-in-dns", null);
+        if (kind == ProbeKind.RejectedIp) return Remember(name, "not-on-network", null);
+
+        var isIp = kind == ProbeKind.UnicastIp;
         var ips = isIp ? new List<string> { name } : InventoryBuilder.ResolveIps(name);
         string status;
         string? address = null;
@@ -69,6 +111,11 @@ public static class ClientChecks
             }
             status = Classify(isIp, true, ping);
         }
+        return Remember(name, status, address);
+    }
+
+    static (string Status, string? Address) Remember(string name, string status, string? address)
+    {
         var result = (status, address);
         Cache[name] = result;
         return result;
@@ -80,7 +127,7 @@ public static class ClientChecks
         var rows = new List<ClientCheck>();
         foreach (var cert in certificates.Where(c => Validation.IsValid(c, nowUtc)))
         {
-            var fallback = cert.Sans.FirstOrDefault(s => s.Type == "ip")?.Value;
+            var fallback = cert.Sans.FirstOrDefault(s => s.Type == "ip" && IsUnicastIpv4(s.Value))?.Value;
             foreach (var (client, via) in Names(cert))
             {
                 string status;
