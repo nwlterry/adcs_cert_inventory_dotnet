@@ -6,8 +6,10 @@
     <Nullable>enable</Nullable>
     <RootNamespace>CertInventory</RootNamespace>
     <AssemblyName>CertInventory</AssemblyName>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.1</VersionPrefix>
     <VersionSuffix>beta.1</VersionSuffix>
-    <InformationalVersion>0.1.0-beta.1</InformationalVersion>
+    <InformationalVersion>0.2.1-beta.1</InformationalVersion>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
 </Project>

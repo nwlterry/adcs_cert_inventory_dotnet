@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace CertInventory;
@@ -26,8 +25,9 @@ public static class Program
 
         if (!demo && issuing.Count == 0)
         {
-            Console.WriteLine("CertInventory 0.1.0-beta.1");
-            Console.WriteLine("Look up each valid client certificate by CN, or by one SAN, then validate its serial.");
+            Console.WriteLine("CertInventory 0.2.1-beta.1");
+            Console.WriteLine("Use the CA inventory as the base. Each CN and DNS or IP SAN is a client of that serial.");
+            Console.WriteLine("The collector probes the client and records active, inactive, not-in-dns, or not-on-network.");
             Console.WriteLine();
             Console.WriteLine("  CertInventory --issuing-ca host\\CA-Name --issuing-ca host2\\CA-Name --root-ca-name OFFLINE-ROOT");
             Console.WriteLine("  CertInventory --demo --output cert-inventory.json");
@@ -151,11 +151,12 @@ public static class Program
 
     static string WriteJson(InventorySnapshot snapshot, string path)
     {
+        if (path.IndexOfAny(new[] { '\r', '\n', '\0' }) >= 0)
+            throw new ArgumentException("Output path is not valid.");
         var full = Path.GetFullPath(path);
         var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
         {
             WriteIndented = true,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         });
         File.WriteAllText(full, json, new UTF8Encoding(false));
         return full;
