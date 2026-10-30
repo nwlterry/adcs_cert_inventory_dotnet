@@ -2,7 +2,7 @@
 
 Collect issued certificates from a two-tier AD CS hierarchy (offline root, two or more issuing CAs). The CA inventory is the base. For each valid certificate, the common name and every DNS or IP SAN is a client of that serial. Several clients may use the same certificate. That is not a conflict.
 
-The collector probes each client on the local network and records the last-5-minute status: active, inactive, not in DNS, or not on the network. Copy the JSON to the console host. The console does not resolve names and does not use the internet.
+The collector probes each client on the local network and records the last-5-minute status: active, inactive, not in DNS, or not on the network. `--serve` then hosts the on-prem dashboard on this machine, next to that JSON file. The page only reads the inventory from the same host. It does not resolve names and it does not use the internet.
 
 Live collection runs on a workstation that can reach every issuing CA and has the Certification Authority tools installed (`certadm.dll`, RSAT: AD CS). `--demo` and `--self-test` do not contact a CA.
 
@@ -13,14 +13,16 @@ PowerShell port: [adcs_cert_inventory-powershell](https://github.com/nwlterry/ad
 ## Collect
 
 ```powershell
-dotnet run --project src/CertInventory -- --issuing-ca 'pki-ica01.corp.local\CORP-ISSUING-CA-01' --issuing-ca 'pki-ica02.corp.local\CORP-ISSUING-CA-02' --root-ca-name 'CORP-OFFLINE-ROOT-CA' --output .\cert-inventory.json
+dotnet run --project src/CertInventory -- --issuing-ca 'pki-ica01.corp.local\CORP-ISSUING-CA-01' --issuing-ca 'pki-ica02.corp.local\CORP-ISSUING-CA-02' --root-ca-name 'CORP-OFFLINE-ROOT-CA' --serve
 ```
 
 After `dotnet publish -c Release -r win-x64 --self-contained false`:
 
 ```powershell
-.\CertInventory.exe --issuing-ca 'pki-ica01.corp.local\CORP-ISSUING-CA-01' --issuing-ca 'pki-ica02.corp.local\CORP-ISSUING-CA-02' --root-ca-name 'CORP-OFFLINE-ROOT-CA'
+.\CertInventory.exe --issuing-ca 'pki-ica01.corp.local\CORP-ISSUING-CA-01' --issuing-ca 'pki-ica02.corp.local\CORP-ISSUING-CA-02' --root-ca-name 'CORP-OFFLINE-ROOT-CA' --serve
 ```
+
+Open `http://127.0.0.1:8787/` on that machine. The dashboard files are `dashboard/index.html` beside the program. Keep that folder with the executable.
 
 | Argument | Role |
 |---|---|
@@ -31,7 +33,17 @@ After `dotnet publish -c Release -r win-x64 --self-contained false`:
 | `--include-expired` | Also keep certificates that have already expired. |
 | `--skip-dns` | Do not resolve CN and DNS SAN names while building the system list. The client-status probe still runs. |
 | `--demo` | Write a small file and do not contact a CA, DNS, or the network. |
+| `--serve` | After collection, host the on-prem dashboard until Ctrl+C. |
+| `--listen` | HTTP prefix. Default `http://127.0.0.1:8787/`. One address only. Do not use `+` or `*`. |
 | `--self-test` | Check serial rules, shared-certificate rows, and that a bad name is not looked up. |
+
+`--serve` with no issuing CA hosts the JSON already at `--output` and does not contact a CA. To show the console to another host on the same isolated network:
+
+```powershell
+.\CertInventory.exe --serve --listen http://10.16.1.50:8787/ --output .\cert-inventory.json
+```
+
+If Windows refuses that prefix, reserve it once: `netsh http add urlacl url=http://10.16.1.50:8787/ user=DOMAIN\ops`. Loopback does not need a reservation. The listener answers GET and HEAD only, and only `/` and `/cert-inventory.json`.
 
 Exit codes: `0` collected, `1` nothing collected, `2` collected but at least one issuing CA failed.
 
@@ -69,7 +81,7 @@ A name is sent to DNS or ping only when it is a DNS name, or a unicast IPv4 addr
 
 ## Security
 
-- The collector is the only program that talks to the CAs, DNS, and ICMP. The dashboard only reads the JSON file.
+- The collector is the only program that talks to the CAs, DNS, and ICMP. The dashboard is hosted by that same process and only reads the JSON file. It makes no outbound call.
 - `certutil.exe` is started with `ArgumentList`, not through a shell. The config must be `hostname\CA Name`. It cannot start with `-` or contain quotes, newlines, or shell characters.
 - Certificate bytes from the CA are loaded as a certificate with an ephemeral key set. They are not executed.
 - JSON is written with the default encoder, so `<` in a name stays escaped.

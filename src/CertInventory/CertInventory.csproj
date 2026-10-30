@@ -6,10 +6,14 @@
     <Nullable>enable</Nullable>
     <RootNamespace>CertInventory</RootNamespace>
     <AssemblyName>CertInventory</AssemblyName>
-    <VersionPrefix>0.2.1</VersionPrefix>
+    <VersionPrefix>0.3.0</VersionPrefix>
     <VersionSuffix>beta.1</VersionSuffix>
-    <InformationalVersion>0.2.1-beta.1</InformationalVersion>
+    <InformationalVersion>0.3.0-beta.1</InformationalVersion>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\dashboard\index.html" LogicalName="dashboard.index.html" />
+    <Content Include="..\..\dashboard\index.html" Link="dashboard\index.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Always" />
+  </ItemGroup>
 </Project>

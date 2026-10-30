@@ -10,10 +10,12 @@ public static class Program
         if (Has(args, "--self-test")) return Validation.SelfTest();
 
         var demo = Has(args, "--demo");
+        var serve = Has(args, "--serve");
         var includeExpired = Has(args, "--include-expired");
         var skipDns = Has(args, "--skip-dns") || demo;
         var root = Value(args, "--root-ca-name") ?? "OFFLINE-ROOT-CA";
         var output = Value(args, "--output") ?? "cert-inventory.json";
+        var listen = Value(args, "--listen") ?? "http://127.0.0.1:8787/";
         var window = 30;
         var windowText = Value(args, "--expiry-window-days");
         if (windowText != null && !int.TryParse(windowText, out window))
@@ -25,14 +27,20 @@ public static class Program
 
         if (!demo && issuing.Count == 0)
         {
-            Console.WriteLine("CertInventory 0.2.1-beta.1");
+            if (serve)
+                return DashboardHost.Run(Path.GetFullPath(output), listen);
+
+            Console.WriteLine("CertInventory 0.3.0-beta.1");
             Console.WriteLine("Use the CA inventory as the base. Each CN and DNS or IP SAN is a client of that serial.");
             Console.WriteLine("The collector probes the client and records active, inactive, not-in-dns, or not-on-network.");
+            Console.WriteLine("Then --serve hosts the on-prem dashboard on this machine. The page does not use the internet.");
             Console.WriteLine();
-            Console.WriteLine("  CertInventory --issuing-ca host\\CA-Name --issuing-ca host2\\CA-Name --root-ca-name OFFLINE-ROOT");
-            Console.WriteLine("  CertInventory --demo --output cert-inventory.json");
+            Console.WriteLine("  CertInventory --issuing-ca host\\CA-Name --issuing-ca host2\\CA-Name --root-ca-name OFFLINE-ROOT --serve");
+            Console.WriteLine("  CertInventory --demo --serve");
+            Console.WriteLine("  CertInventory --serve --output cert-inventory.json");
             Console.WriteLine("  CertInventory --self-test");
             Console.WriteLine();
+            Console.WriteLine("Default listen address is http://127.0.0.1:8787/. Bind one isolated-network address with --listen.");
             Console.WriteLine("Live collection needs Windows, RSAT AD CS, and a path to every issuing CA.");
             return 1;
         }
@@ -101,7 +109,10 @@ public static class Program
         snapshot.Validations = new();
         var path = WriteJson(snapshot, output);
         PrintSummary(snapshot, now, window, path);
-        return snapshot.Errors.Count > 0 ? 2 : 0;
+        var code = snapshot.Errors.Count > 0 ? 2 : 0;
+        if (!serve) return code;
+        var hosted = DashboardHost.Run(path, listen);
+        return hosted != 0 ? hosted : code;
     }
 
     static void PrintSummary(InventorySnapshot snapshot, DateTime now, int window, string path)
