@@ -59,6 +59,17 @@ public sealed class ClientValidation
     [JsonPropertyName("verified")] public bool Verified { get; set; }
 }
 
+public sealed class ClientCheck
+{
+    [JsonPropertyName("certId")] public string CertId { get; set; } = "";
+    [JsonPropertyName("serial")] public string Serial { get; set; } = "";
+    [JsonPropertyName("client")] public string Client { get; set; } = "";
+    [JsonPropertyName("via")] public string Via { get; set; } = "cn";
+    [JsonPropertyName("status")] public string Status { get; set; } = "not-in-dns";
+    [JsonPropertyName("checkedAt")] public string CheckedAt { get; set; } = "";
+    [JsonPropertyName("address")] public string? Address { get; set; }
+}
+
 public sealed class CollectError
 {
     [JsonPropertyName("config")] public string Config { get; set; } = "";
@@ -75,6 +86,8 @@ public sealed class InventorySnapshot
     [JsonPropertyName("issuing")] public List<IssuingCa> Issuing { get; set; } = new();
     [JsonPropertyName("certificates")] public List<CertRecord> Certificates { get; set; } = new();
     [JsonPropertyName("errors")] public List<CollectError> Errors { get; set; } = new();
+    [JsonPropertyName("clientChecks")] public List<ClientCheck> ClientChecks { get; set; } = new();
+    [JsonPropertyName("statusWindowMinutes")] public int StatusWindowMinutes { get; set; } = 5;
     [JsonPropertyName("comparisons")] public List<Comparison> Comparisons { get; set; } = new();
     [JsonPropertyName("validations")] public List<ClientValidation> Validations { get; set; } = new();
 }

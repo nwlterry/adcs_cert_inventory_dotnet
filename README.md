@@ -1,14 +1,14 @@
 # AD CS certificate inventory (.NET)
 
-.NET 8 collector for a two-tier AD CS hierarchy (offline root, two or more issuing CAs). For each valid client certificate, look it up by common name, or by exactly one SAN when the common name is not on a valid certificate. The serial number on the certificate that lookup returns is the serial used for validation. When both the common name and that one SAN resolve, the two serials are compared.
+.NET 8 collector for a two-tier AD CS hierarchy (offline root, two or more issuing CAs). The CA inventory is the base. For each valid certificate, every common name and SAN is a client of that serial. Several clients may use the same certificate; that is not a conflict.
 
-The summary also lists certificates that expire within 30 days, with the system name and IP taken from the CN and SAN.
+The collector then probes each client on the local network. The result is the last-5-minute status: active, inactive, not in DNS, or not on the network. Copy the JSON to the console host. The console does not use the internet.
 
 Live collection runs on a workstation that can reach every issuing CA and has the Certification Authority tools installed (`certadm.dll`, RSAT: AD CS). `--demo` and `--self-test` do not contact a CA.
 
 The offline root is recorded by name only. End-entity rows come from the issuing CAs.
 
-PowerShell port: [adcs_cert_inventory-powershell](https://github.com/nwlterry/adcs_cert_inventory-powershell).
+PowerShell port: [adcs_cert_inventory](https://github.com/nwlterry/adcs_cert_inventory).
 
 ## Collect
 
@@ -39,26 +39,24 @@ The program opens each CA with `CertificateAuthority.View`. If that COM object f
 
 `cert-inventory.json` contains host names, serials, and addresses. It is gitignored. Do not commit a live collection.
 
-## Validation
+## Clients
 
-A certificate is valid when disposition is issued, `NotBefore` has passed, and `NotAfter` is still in the future. Revoked rows stay in the file and are excluded from validation.
+A certificate is valid when disposition is issued, `NotBefore` has passed, and `NotAfter` is still in the future.
 
-For each valid client certificate the program:
+For each valid certificate the program:
 
-1. Looks the certificate up by common name.
-2. If that common name is not on a valid issued certificate, looks it up by exactly one SAN: the first DNS name that differs from the CN, otherwise the CN itself, otherwise one IP SAN.
-3. Reads the serial number on the certificate that lookup returns. That serial is the validation serial. `verified` is true only when the lookup returns one serial.
-4. When both the common name and that one SAN resolve, compares the two serial sets.
+1. Reads the certificate serial from the CA inventory.
+2. Lists the common name, then each DNS or IP SAN, as a client of that serial.
+3. Probes the client on this network (DNS, then one ICMP echo, 1 second).
 
-| Kind | Meaning |
+| Status | Meaning |
 |---|---|
-| `match` | CN and the one SAN resolve to the same single valid serial. |
-| `duplicate` | The names agree, but more than one certificate is still valid. Revoke the superseded serial. |
-| `divergent` | The SAN is covered by a different set of valid serials than the CN. |
-| `mismatch` | The two lookups share no serial. |
-| `cn-missing` / `san-missing` | No valid issued certificate for that name. |
+| `active` | The name resolved, or it is an IP, and the probe answered. |
+| `inactive` | DNS has the name, but the host did not answer. |
+| `not-in-dns` | No DNS record. |
+| `not-on-network` | The address is known, but the network path did not answer (unreachable). |
 
-`validations[]` is the CN-or-one-SAN lookup and the serial taken from it. `comparisons[]` is the cross-check, and only non-matches are kept.
+`clientChecks[]` is that list. `checkedAt` is the probe time. The console treats a check as the last 5 minutes when the file is newer than `statusWindowMinutes` (default 5). Re-run the collector on the isolated network to refresh it. The console does not resolve client names and does not need a route to the public internet.
 
 Output schema is `ca-ledger/1`, the same file the PowerShell collector writes.
 

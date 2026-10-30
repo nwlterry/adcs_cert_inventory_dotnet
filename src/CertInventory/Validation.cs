@@ -117,22 +117,15 @@ public static class Validation
 
         var now = DateTime.UtcNow;
         var demo = InventoryBuilder.Demo("OFFLINE-ROOT-CA", 30);
-        var findings = Findings(demo.Certificates, now);
-        if (findings.Count != 1 || findings[0].Kind != "duplicate" || findings[0].Cn != "web-iis-01.corp.local")
-            failures.Add("demo duplicate finding");
-        if (findings.Count == 1 && findings[0].San != "www.corp.local")
-            failures.Add("demo SAN is not www.corp.local");
-
-        var checks = ClientValidations(demo.Certificates, now);
-        var es = checks.FirstOrDefault(c => c.Name == "es-data-01.obs.corp.local");
-        var iis = checks.FirstOrDefault(c => c.Name == "web-iis-01.corp.local");
-        var ocp = checks.FirstOrDefault(c => c.Name == "ocp-api.ocp.corp.local");
-        if (es == null || es.Via != "cn" || !es.Verified || es.Serials.Count != 1 || es.Serials[0] != "4f12a1000001")
-            failures.Add("es-data serial validation");
-        if (iis == null || iis.Via != "cn" || iis.Verified || iis.Serials.Count != 2)
-            failures.Add("iis duplicate serials are not a single validation serial");
-        if (ocp == null || !ocp.Verified || ocp.Serials[0] != "d10100000001")
-            failures.Add("ocp serial validation");
+        var www = ClientChecks.Build(demo.Certificates, now, true).Where(c => c.Client == "www.corp.local").ToList();
+        if (www.Count != 2 || www.Select(c => c.Serial).Distinct().Count() != 2)
+            failures.Add("shared certificate should list each client, not a conflict");
+        if (ClientChecks.Classify(false, false, null) != "not-in-dns") failures.Add("dns miss");
+        if (ClientChecks.Classify(true, false, null) != "not-on-network") failures.Add("ip miss");
+        if (ClientChecks.Classify(false, true, System.Net.NetworkInformation.IPStatus.Success) != "active") failures.Add("active");
+        if (ClientChecks.Classify(false, true, System.Net.NetworkInformation.IPStatus.TimedOut) != "inactive") failures.Add("inactive");
+        if (ClientChecks.Classify(false, true, System.Net.NetworkInformation.IPStatus.DestinationHostUnreachable) != "not-on-network")
+            failures.Add("unreachable");
 
         var sanOnly = new CertRecord
         {
@@ -143,9 +136,9 @@ public static class Validation
             Serial = "ab",
             Sans = new List<SanName> { new() { Type = "dns", Value = "solo.corp.local" } },
         };
-        var sanCheck = ClientValidations(new[] { sanOnly }, now);
-        if (sanCheck.Count != 1 || sanCheck[0].Via != "san" || sanCheck[0].Name != "solo.corp.local" || !sanCheck[0].Verified)
-            failures.Add("SAN-only lookup");
+        var sanRows = ClientChecks.Build(new[] { sanOnly }, now, true);
+        if (sanRows.Count != 1 || sanRows[0].Via != "san" || sanRows[0].Client != "solo.corp.local" || sanRows[0].Serial != "ab")
+            failures.Add("SAN client keeps the certificate serial");
 
         if (failures.Count == 0)
         {

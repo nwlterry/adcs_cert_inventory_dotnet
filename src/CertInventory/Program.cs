@@ -94,8 +94,11 @@ public static class Program
         }
 
         var now = DateTime.UtcNow;
-        snapshot.Comparisons = Validation.Findings(snapshot.Certificates, now);
-        snapshot.Validations = Validation.ClientValidations(snapshot.Certificates, now);
+        var demoRun = demo;
+        snapshot.ClientChecks = ClientChecks.Build(snapshot.Certificates, now, demoRun);
+        snapshot.StatusWindowMinutes = 5;
+        snapshot.Comparisons = new();
+        snapshot.Validations = new();
         var path = WriteJson(snapshot, output);
         PrintSummary(snapshot, now, window, path);
         return snapshot.Errors.Count > 0 ? 2 : 0;
@@ -125,20 +128,24 @@ public static class Program
             var days = Math.Ceiling((DateTimeOffset.Parse(row.NotAfter).UtcDateTime - now).TotalDays);
             Console.WriteLine($"    {days,3:0}d  {row.Cn}  {ipText}  {row.IssuerName}");
         }
-        Console.WriteLine("  Client validation       " + snapshot.Validations.Count);
-        foreach (var check in snapshot.Validations)
+        Console.WriteLine("  Client status, last 5 min");
+        var counts = new Dictionary<string, int>
         {
-            var mark = check.Verified ? "ok" : "check";
-            Console.WriteLine($"    {mark,-5} via {check.Via,-3} {check.Name}");
-            Console.WriteLine("           serial " + string.Join(", ", check.Serials));
-        }
-        Console.WriteLine("  Serial conflicts        " + snapshot.Comparisons.Count);
-        foreach (var finding in snapshot.Comparisons)
+            ["active"] = 0,
+            ["inactive"] = 0,
+            ["not-in-dns"] = 0,
+            ["not-on-network"] = 0,
+        };
+        foreach (var check in snapshot.ClientChecks)
         {
-            Console.WriteLine($"    {finding.Kind,-12} {finding.Cn}  SAN {finding.San}");
-            Console.WriteLine("                 CN  " + string.Join(", ", finding.CnSerials));
-            Console.WriteLine("                 SAN " + string.Join(", ", finding.SanSerials));
+            if (counts.ContainsKey(check.Status)) counts[check.Status]++;
         }
+        Console.WriteLine("    active           " + counts["active"]);
+        Console.WriteLine("    inactive         " + counts["inactive"]);
+        Console.WriteLine("    not in DNS       " + counts["not-in-dns"]);
+        Console.WriteLine("    not on network   " + counts["not-on-network"]);
+        foreach (var check in snapshot.ClientChecks.Where(c => c.Status != "active"))
+            Console.WriteLine($"    {check.Status,-16} {check.Via,-3} {check.Client}  serial {check.Serial}");
         Console.WriteLine("Wrote " + path);
     }
 
