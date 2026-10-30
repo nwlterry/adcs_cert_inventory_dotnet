@@ -8,7 +8,7 @@ Live collection runs on a workstation that can reach every issuing CA and has th
 
 The offline root is recorded by name only. End-entity rows come from the issuing CAs.
 
-PowerShell port: [adcs_cert_inventory](https://github.com/nwlterry/adcs_cert_inventory).
+PowerShell port: [adcs_cert_inventory-powershell](https://github.com/nwlterry/adcs_cert_inventory-powershell).
 
 ## Collect
 
